@@ -1,0 +1,5 @@
+{
+  "name": "BD Logistics Hub",
+  "description": "A centralized dashboard for managing WordPress orders and integrating with Bangladeshi courier services like Pathao, RedX, and Steadfast.",
+  "requestFramePermissions": []
+}
