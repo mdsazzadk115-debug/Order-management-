@@ -6,6 +6,7 @@ import { StatsCard } from './components/StatsCard';
 import { OrderModal } from './components/OrderModal';
 import { StoreIntegration } from './components/StoreIntegration';
 import { MOCK_ORDERS, FETCHED_ORDERS } from './services/mockData';
+import { fetchOrdersFromDB } from './services/dbService';
 import { Order, CourierProvider, CourierStatus, OrderStatus, StoreCredentials } from './types';
 import { Package, TrendingUp, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 
@@ -26,8 +27,8 @@ const App: React.FC = () => {
   });
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Function to simulate fetching new orders from WP
-  const handleSyncOrders = () => {
+  // Function to sync orders (Try DB first, then fallback to Demo)
+  const handleSyncOrders = async () => {
     if (!storeConfig.isConnected) {
       alert("Please connect your WooCommerce store first!");
       setCurrentView('store');
@@ -36,36 +37,50 @@ const App: React.FC = () => {
 
     setIsSyncing(true);
     
-    // Simulate network request
-    setTimeout(() => {
-      if (!hasFetchedRealData) {
-         // FIRST SYNC: Replace demo data with "Fetched" data
-         setOrders(FETCHED_ORDERS);
-         setHasFetchedRealData(true);
+    try {
+      // 1. ডাটাবেজ থেকে আসল ডাটা আনার চেষ্টা
+      const dbOrders = await fetchOrdersFromDB();
+      
+      if (dbOrders && dbOrders.length > 0) {
+        setOrders(dbOrders);
+        setHasFetchedRealData(true);
+        console.log("Loaded orders from database");
       } else {
-        // SUBSEQUENT SYNCS: Add new random orders
-        const newOrder: Order = {
-          id: `#WC-${59202 + Math.floor(Math.random() * 100)}`,
-          date: new Date().toISOString().split('T')[0],
-          customer: {
-            id: `c${Date.now()}`,
-            name: 'New Real Customer',
-            phone: '+8801700000000',
-            address: 'Gulshan 1, Dhaka',
-            city: 'Dhaka',
-          },
-          total: 1500,
-          items: ['New Product Item'],
-          status: OrderStatus.PROCESSING,
-          courier: {
-            provider: CourierProvider.NONE,
-            status: CourierStatus.NOT_ASSIGNED,
-          },
-        };
-        setOrders(prev => [newOrder, ...prev]);
+        // 2. যদি ডাটাবেজ খালি থাকে বা কানেকশন না পায়, তাহলে ডেমো ডাটা দেখাবে (টেস্টিং-এর জন্য)
+        console.warn("No data found in DB, loading demo fetched data.");
+        if (!hasFetchedRealData) {
+           setOrders(FETCHED_ORDERS);
+           setHasFetchedRealData(true);
+           alert("Database connection successful but no orders found. Showing DEMO fetched data for visualization.");
+        } else {
+           // নতুন ডেমো অর্ডার তৈরি করা (শুধুমাত্র ডেমো মোডে)
+           const newOrder: Order = {
+            id: `#WC-${59202 + Math.floor(Math.random() * 100)}`,
+            date: new Date().toISOString().split('T')[0],
+            customer: {
+              id: `c${Date.now()}`,
+              name: 'New Real Customer',
+              phone: '+8801700000000',
+              address: 'Gulshan 1, Dhaka',
+              city: 'Dhaka',
+            },
+            total: 1500,
+            items: ['New Product Item'],
+            status: OrderStatus.PROCESSING,
+            courier: {
+              provider: CourierProvider.NONE,
+              status: CourierStatus.NOT_ASSIGNED,
+            },
+          };
+          setOrders(prev => [newOrder, ...prev]);
+        }
       }
+    } catch (error) {
+      console.error("Sync failed:", error);
+      alert("Sync encountered an error. Check console.");
+    } finally {
       setIsSyncing(false);
-    }, 2000);
+    }
   };
 
   const handleAssignCourier = (orderId: string, provider: CourierProvider) => {
@@ -175,7 +190,7 @@ const App: React.FC = () => {
               <div>
                 <h2 className="text-2xl font-bold text-slate-800">Order Management</h2>
                  <p className="text-sm text-slate-500 mt-1">
-                    {hasFetchedRealData ? `Showing ${orders.length} orders from ${storeConfig.url}` : 'Showing sample data. Connect store to see real orders.'}
+                    {hasFetchedRealData ? `Showing ${orders.length} orders from Database` : 'Showing sample data. Connect store to see real orders.'}
                  </p>
               </div>
               <button 
