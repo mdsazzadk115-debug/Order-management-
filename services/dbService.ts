@@ -10,8 +10,8 @@ const API_BASE_URL = isProduction
 export const fetchOrdersFromDB = async (): Promise<Order[]> => {
   try {
     const response = await fetch(`${API_BASE_URL}?action=get_orders`);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const text = await response.text();
+    
     try {
         const data = JSON.parse(text);
         if (data.error) {
@@ -76,20 +76,27 @@ export const saveCourierConfigToDB = async (config: CourierConfig): Promise<{ su
             })
         });
 
-        if (!response.ok) {
-            return { success: false, message: `HTTP Error: ${response.status} ${response.statusText}` };
+        // Always read the text first
+        const text = await response.text();
+        
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (e) {
+            // Not JSON
         }
 
-        const text = await response.text();
-        try {
-            const result = JSON.parse(text);
-            if (result.success) {
-                return { success: true };
-            }
-            return { success: false, message: result.error || 'Unknown server error' };
-        } catch (e) {
-            return { success: false, message: `Invalid JSON response: ${text.substring(0, 100)}...` };
+        if (!response.ok) {
+            // Try to use JSON error from PHP, or fall back to stripped HTML
+            const errorMsg = result?.error || text.substring(0, 300).replace(/<[^>]*>?/gm, ''); 
+            return { success: false, message: `Server Error (${response.status}): ${errorMsg}` };
         }
+
+        if (result && result.success) {
+            return { success: true };
+        }
+        return { success: false, message: result?.error || 'Unknown server error' };
+
     } catch (error: any) {
         console.error("Failed to save courier config:", error);
         return { success: false, message: error.message || 'Network request failed' };
@@ -116,24 +123,28 @@ export const saveStoreConfigToDB = async (config: StoreCredentials): Promise<{ s
             body: JSON.stringify(config)
         });
 
-        if (!response.ok) {
-            if (response.status === 404) {
-                return { success: false, message: 'API file not found (404). Ensure "backend/api.php" is uploaded.' };
-            }
-            return { success: false, message: `Server Error: ${response.status} ${response.statusText}` };
+        const text = await response.text();
+        
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (e) {
+             // Failed to parse JSON
         }
 
-        const text = await response.text();
-        try {
-            const result = JSON.parse(text);
-            if (result.success) {
-                return { success: true };
+        if (!response.ok) {
+            if (response.status === 404) {
+                return { success: false, message: 'API file not found (404). Ensure "backend/api.php" exists.' };
             }
-            return { success: false, message: result.error || 'Database Error: Check db_connect.php' };
-        } catch (e) {
-            // Often PHP warnings/errors appear before JSON if display_errors is on
-            return { success: false, message: `Response Parse Error: ${text.substring(0, 150)}...` };
+            const detailedError = result?.error || text.substring(0, 300).replace(/<[^>]*>?/gm, '');
+            return { success: false, message: `Server Error (${response.status}): ${detailedError}` };
         }
+
+        if (result && result.success) {
+            return { success: true };
+        }
+        return { success: false, message: result?.error || 'Database did not return success status.' };
+
     } catch (error: any) {
         console.error("Failed to save store config:", error);
         return { success: false, message: error.message || 'Network Connection Error' };
