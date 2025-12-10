@@ -61,7 +61,7 @@ export const fetchCustomerStatsFromDB = async (phone: string): Promise<CustomerC
   }
 };
 
-// --- NEW METHODS FOR CONFIGURATION ---
+// --- CONFIGURATION ---
 
 export const saveCourierConfigToDB = async (config: CourierConfig): Promise<{ success: boolean; message?: string }> => {
     try {
@@ -76,29 +76,18 @@ export const saveCourierConfigToDB = async (config: CourierConfig): Promise<{ su
             })
         });
 
-        // Always read the text first
         const text = await response.text();
-        
         let result;
-        try {
-            result = JSON.parse(text);
-        } catch (e) {
-            // Not JSON
-        }
+        try { result = JSON.parse(text); } catch (e) {}
 
         if (!response.ok) {
-            // Try to use JSON error from PHP, or fall back to stripped HTML
             const errorMsg = result?.error || text.substring(0, 300).replace(/<[^>]*>?/gm, ''); 
             return { success: false, message: `Server Error (${response.status}): ${errorMsg}` };
         }
 
-        if (result && result.success) {
-            return { success: true };
-        }
+        if (result && result.success) return { success: true };
         return { success: false, message: result?.error || 'Unknown server error' };
-
     } catch (error: any) {
-        console.error("Failed to save courier config:", error);
         return { success: false, message: error.message || 'Network request failed' };
     }
 };
@@ -110,7 +99,6 @@ export const getCourierConfigsFromDB = async (): Promise<any[]> => {
         const data = await response.json();
         return Array.isArray(data) ? data : [];
     } catch (error) {
-        console.error("Failed to fetch courier configs:", error);
         return [];
     }
 };
@@ -122,31 +110,19 @@ export const saveStoreConfigToDB = async (config: StoreCredentials): Promise<{ s
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(config)
         });
-
         const text = await response.text();
-        
         let result;
-        try {
-            result = JSON.parse(text);
-        } catch (e) {
-             // Failed to parse JSON
-        }
+        try { result = JSON.parse(text); } catch (e) {}
 
         if (!response.ok) {
-            if (response.status === 404) {
-                return { success: false, message: 'API file not found (404). Ensure "backend/api.php" exists.' };
-            }
+            if (response.status === 404) return { success: false, message: 'API file not found (404).' };
             const detailedError = result?.error || text.substring(0, 300).replace(/<[^>]*>?/gm, '');
             return { success: false, message: `Server Error (${response.status}): ${detailedError}` };
         }
 
-        if (result && result.success) {
-            return { success: true };
-        }
+        if (result && result.success) return { success: true };
         return { success: false, message: result?.error || 'Database did not return success status.' };
-
     } catch (error: any) {
-        console.error("Failed to save store config:", error);
         return { success: false, message: error.message || 'Network Connection Error' };
     }
 };
@@ -156,12 +132,33 @@ export const getStoreConfigFromDB = async (): Promise<StoreCredentials | null> =
         const response = await fetch(`${API_BASE_URL}?action=get_store_config`);
         if (!response.ok) return null;
         const data = await response.json();
-        if (data && data.url) {
-            return data as StoreCredentials;
-        }
+        if (data && data.url) return data as StoreCredentials;
         return null;
     } catch (error) {
-        console.error("Failed to fetch store config:", error);
         return null;
+    }
+};
+
+// --- SYNC ---
+
+export const syncOrdersFromWooCommerce = async (): Promise<{ success: boolean; message?: string; count?: number }> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}?action=sync_from_woo`);
+        const text = await response.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (e) {
+            console.error("Sync response invalid JSON:", text);
+            return { success: false, message: "Invalid response from server" };
+        }
+
+        if (result.success) {
+            return { success: true, count: result.count, message: result.message };
+        } else {
+            return { success: false, message: result.message || result.error };
+        }
+    } catch (error: any) {
+        return { success: false, message: error.message };
     }
 };

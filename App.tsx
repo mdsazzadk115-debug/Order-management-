@@ -6,7 +6,7 @@ import { StatsCard } from './components/StatsCard';
 import { OrderModal } from './components/OrderModal';
 import { StoreIntegration } from './components/StoreIntegration';
 import { MOCK_ORDERS, FETCHED_ORDERS } from './services/mockData';
-import { fetchOrdersFromDB, getStoreConfigFromDB } from './services/dbService';
+import { fetchOrdersFromDB, getStoreConfigFromDB, syncOrdersFromWooCommerce } from './services/dbService';
 import { Order, CourierProvider, CourierStatus, OrderStatus, StoreCredentials } from './types';
 import { Package, TrendingUp, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 
@@ -38,7 +38,7 @@ const App: React.FC = () => {
     loadStoreConfig();
   }, []);
 
-  // Function to sync orders (Try DB first, then fallback to Demo)
+  // Function to sync orders
   const handleSyncOrders = async () => {
     if (!storeConfig.isConnected) {
       alert("Please connect your WooCommerce store first!");
@@ -49,45 +49,39 @@ const App: React.FC = () => {
     setIsSyncing(true);
     
     try {
-      // 1. ডাটাবেজ থেকে আসল ডাটা আনার চেষ্টা
+      // 1. Trigger Server Sync (Fetch from Woo -> Save to DB)
+      console.log("Starting server sync...");
+      const syncResult = await syncOrdersFromWooCommerce();
+      
+      if (!syncResult.success) {
+          console.warn("Sync Warning:", syncResult.message);
+          // We don't stop here, we still try to fetch what's in the DB, 
+          // but we alert the user if it's a critical failure.
+          if (syncResult.message?.includes("API Error")) {
+             alert(`Sync Failed: ${syncResult.message}`);
+          }
+      } else {
+          console.log(`Synced ${syncResult.count} orders successfully.`);
+      }
+
+      // 2. Fetch from DB (Now it should have data)
       const dbOrders = await fetchOrdersFromDB();
       
       if (dbOrders && dbOrders.length > 0) {
         setOrders(dbOrders);
         setHasFetchedRealData(true);
-        console.log("Loaded orders from database");
       } else {
-        // 2. যদি ডাটাবেজ খালি থাকে বা কানেকশন না পায়, তাহলে ডেমো ডাটা দেখাবে (টেস্টিং-এর জন্য)
-        console.warn("No data found in DB, loading demo fetched data.");
+        // If still empty after sync
+        console.warn("No data found in DB even after sync.");
         if (!hasFetchedRealData) {
+           // Fallback to demo data only if we haven't successfully loaded real data yet
+           alert("Database connection successful but no orders found in your store (or sync failed). Showing DEMO fetched data for visualization.");
            setOrders(FETCHED_ORDERS);
            setHasFetchedRealData(true);
-           alert("Database connection successful but no orders found. Showing DEMO fetched data for visualization.");
-        } else {
-           // নতুন ডেমো অর্ডার তৈরি করা (শুধুমাত্র ডেমো মোডে)
-           const newOrder: Order = {
-            id: `#WC-${59202 + Math.floor(Math.random() * 100)}`,
-            date: new Date().toISOString().split('T')[0],
-            customer: {
-              id: `c${Date.now()}`,
-              name: 'New Real Customer',
-              phone: '+8801700000000',
-              address: 'Gulshan 1, Dhaka',
-              city: 'Dhaka',
-            },
-            total: 1500,
-            items: ['New Product Item'],
-            status: OrderStatus.PROCESSING,
-            courier: {
-              provider: CourierProvider.NONE,
-              status: CourierStatus.NOT_ASSIGNED,
-            },
-          };
-          setOrders(prev => [newOrder, ...prev]);
         }
       }
     } catch (error) {
-      console.error("Sync failed:", error);
+      console.error("Sync process failed:", error);
       alert("Sync encountered an error. Check console.");
     } finally {
       setIsSyncing(false);
