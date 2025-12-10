@@ -61,15 +61,15 @@ export const CourierIntegration: React.FC = () => {
     };
 
     // Save to Database
-    const success = await saveCourierConfigToDB(updatedConfig);
+    const result = await saveCourierConfigToDB(updatedConfig);
 
-    if (success) {
+    if (result.success) {
         setCouriers(prev => prev.map(c => 
             c.id === selectedCourier.id ? updatedConfig : c
         ));
         closeModal();
     } else {
-        alert("Failed to save configuration to database. Check connection.");
+        alert(`Failed to save configuration:\n${result.message}`);
     }
     
     setIsSaving(false);
@@ -80,14 +80,14 @@ export const CourierIntegration: React.FC = () => {
       const courierToDisconnect = couriers.find(c => c.id === id);
       if (courierToDisconnect) {
           const updatedConfig = { ...courierToDisconnect, connected: false, credentials: {} };
-          const success = await saveCourierConfigToDB(updatedConfig);
+          const result = await saveCourierConfigToDB(updatedConfig);
           
-          if (success) {
+          if (result.success) {
               setCouriers(prev => prev.map(c => 
                 c.id === id ? updatedConfig : c
               ));
           } else {
-              alert("Failed to update database.");
+              alert(`Failed to update database:\n${result.message}`);
           }
       }
     }

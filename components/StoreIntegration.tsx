@@ -21,12 +21,12 @@ export const StoreIntegration: React.FC<StoreIntegrationProps> = ({ config, onSa
     setIsSaving(true);
     
     const newConfig = { ...formData, isConnected: true };
-    const success = await saveStoreConfigToDB(newConfig);
+    const result = await saveStoreConfigToDB(newConfig);
 
-    if (success) {
+    if (result.success) {
         onSave(newConfig);
     } else {
-        alert("Failed to connect to database. Please check your hosting configuration.");
+        alert(`Connection Failed:\n${result.message}`);
     }
     
     setIsSaving(false);
@@ -35,11 +35,11 @@ export const StoreIntegration: React.FC<StoreIntegrationProps> = ({ config, onSa
   const handleDisconnect = async () => {
     if(confirm("Are you sure you want to disconnect?")) {
         const newConfig = { ...formData, isConnected: false };
-        const success = await saveStoreConfigToDB(newConfig);
-        if (success) {
+        const result = await saveStoreConfigToDB(newConfig);
+        if (result.success) {
             onSave(newConfig);
         } else {
-            alert("Failed to update database.");
+            alert(`Failed to disconnect:\n${result.message}`);
         }
     }
   };

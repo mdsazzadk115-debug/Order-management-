@@ -63,7 +63,7 @@ export const fetchCustomerStatsFromDB = async (phone: string): Promise<CustomerC
 
 // --- NEW METHODS FOR CONFIGURATION ---
 
-export const saveCourierConfigToDB = async (config: CourierConfig): Promise<boolean> => {
+export const saveCourierConfigToDB = async (config: CourierConfig): Promise<{ success: boolean; message?: string }> => {
     try {
         const response = await fetch(`${API_BASE_URL}?action=save_courier_config`, {
             method: 'POST',
@@ -75,11 +75,24 @@ export const saveCourierConfigToDB = async (config: CourierConfig): Promise<bool
                 credentials: config.credentials
             })
         });
-        const result = await response.json();
-        return result.success === true;
-    } catch (error) {
+
+        if (!response.ok) {
+            return { success: false, message: `HTTP Error: ${response.status} ${response.statusText}` };
+        }
+
+        const text = await response.text();
+        try {
+            const result = JSON.parse(text);
+            if (result.success) {
+                return { success: true };
+            }
+            return { success: false, message: result.error || 'Unknown server error' };
+        } catch (e) {
+            return { success: false, message: `Invalid JSON response: ${text.substring(0, 100)}...` };
+        }
+    } catch (error: any) {
         console.error("Failed to save courier config:", error);
-        return false;
+        return { success: false, message: error.message || 'Network request failed' };
     }
 };
 
@@ -95,18 +108,35 @@ export const getCourierConfigsFromDB = async (): Promise<any[]> => {
     }
 };
 
-export const saveStoreConfigToDB = async (config: StoreCredentials): Promise<boolean> => {
+export const saveStoreConfigToDB = async (config: StoreCredentials): Promise<{ success: boolean; message?: string }> => {
     try {
         const response = await fetch(`${API_BASE_URL}?action=save_store_config`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(config)
         });
-        const result = await response.json();
-        return result.success === true;
-    } catch (error) {
+
+        if (!response.ok) {
+            if (response.status === 404) {
+                return { success: false, message: 'API file not found (404). Ensure "backend/api.php" is uploaded.' };
+            }
+            return { success: false, message: `Server Error: ${response.status} ${response.statusText}` };
+        }
+
+        const text = await response.text();
+        try {
+            const result = JSON.parse(text);
+            if (result.success) {
+                return { success: true };
+            }
+            return { success: false, message: result.error || 'Database Error: Check db_connect.php' };
+        } catch (e) {
+            // Often PHP warnings/errors appear before JSON if display_errors is on
+            return { success: false, message: `Response Parse Error: ${text.substring(0, 150)}...` };
+        }
+    } catch (error: any) {
         console.error("Failed to save store config:", error);
-        return false;
+        return { success: false, message: error.message || 'Network Connection Error' };
     }
 };
 
