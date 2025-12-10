@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShoppingBag, Key, Globe, CheckCircle, AlertCircle } from 'lucide-react';
 import { StoreCredentials } from '../types';
+import { saveStoreConfigToDB } from '../services/dbService';
 
 interface StoreIntegrationProps {
   config: StoreCredentials;
@@ -15,19 +16,32 @@ export const StoreIntegration: React.FC<StoreIntegrationProps> = ({ config, onSa
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleConnect = (e: React.FormEvent) => {
+  const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     
-    // Simulate API verification delay
-    setTimeout(() => {
-      onSave({ ...formData, isConnected: true });
-      setIsSaving(false);
-    }, 1500);
+    const newConfig = { ...formData, isConnected: true };
+    const success = await saveStoreConfigToDB(newConfig);
+
+    if (success) {
+        onSave(newConfig);
+    } else {
+        alert("Failed to connect to database. Please check your hosting configuration.");
+    }
+    
+    setIsSaving(false);
   };
 
-  const handleDisconnect = () => {
-    onSave({ ...formData, isConnected: false });
+  const handleDisconnect = async () => {
+    if(confirm("Are you sure you want to disconnect?")) {
+        const newConfig = { ...formData, isConnected: false };
+        const success = await saveStoreConfigToDB(newConfig);
+        if (success) {
+            onSave(newConfig);
+        } else {
+            alert("Failed to update database.");
+        }
+    }
   };
 
   return (

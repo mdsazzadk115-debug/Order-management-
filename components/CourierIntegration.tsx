@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { COURIER_CONFIGS } from '../services/mockData';
+import { saveCourierConfigToDB, getCourierConfigsFromDB } from '../services/dbService';
 import { CheckCircle, XCircle, Key, ExternalLink, Settings, Save, X, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { CourierConfig } from '../types';
 
@@ -9,6 +10,27 @@ export const CourierIntegration: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  // Load saved configs from Database on mount
+  useEffect(() => {
+    const loadConfigs = async () => {
+        const savedConfigs = await getCourierConfigsFromDB();
+        if (savedConfigs.length > 0) {
+            setCouriers(prev => prev.map(defaultConfig => {
+                const saved = savedConfigs.find((s: any) => s.id === defaultConfig.id);
+                if (saved) {
+                    return {
+                        ...defaultConfig,
+                        connected: saved.connected,
+                        credentials: saved.credentials
+                    };
+                }
+                return defaultConfig;
+            }));
+        }
+    };
+    loadConfigs();
+  }, []);
 
   const openConfigModal = (courier: CourierConfig) => {
     setSelectedCourier(courier);
@@ -26,31 +48,48 @@ export const CourierIntegration: React.FC = () => {
     setFormData(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleSaveConfig = (e: React.FormEvent) => {
+  const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCourier) return;
 
     setIsSaving(true);
 
-    // Simulate API Validation
-    setTimeout(() => {
-      setCouriers(prev => prev.map(c => 
-        c.id === selectedCourier.id 
-          ? { ...c, connected: true, credentials: formData } 
-          : c
-      ));
-      setIsSaving(false);
-      closeModal();
-    }, 1500);
+    const updatedConfig = { 
+        ...selectedCourier, 
+        connected: true, 
+        credentials: formData 
+    };
+
+    // Save to Database
+    const success = await saveCourierConfigToDB(updatedConfig);
+
+    if (success) {
+        setCouriers(prev => prev.map(c => 
+            c.id === selectedCourier.id ? updatedConfig : c
+        ));
+        closeModal();
+    } else {
+        alert("Failed to save configuration to database. Check connection.");
+    }
+    
+    setIsSaving(false);
   };
 
-  const handleDisconnect = (id: string) => {
+  const handleDisconnect = async (id: string) => {
     if (confirm('Are you sure you want to disconnect? This will stop automatic order syncing.')) {
-      setCouriers(prev => prev.map(c => 
-        c.id === id 
-          ? { ...c, connected: false, credentials: undefined } 
-          : c
-      ));
+      const courierToDisconnect = couriers.find(c => c.id === id);
+      if (courierToDisconnect) {
+          const updatedConfig = { ...courierToDisconnect, connected: false, credentials: {} };
+          const success = await saveCourierConfigToDB(updatedConfig);
+          
+          if (success) {
+              setCouriers(prev => prev.map(c => 
+                c.id === id ? updatedConfig : c
+              ));
+          } else {
+              alert("Failed to update database.");
+          }
+      }
     }
   };
 
@@ -175,7 +214,7 @@ export const CourierIntegration: React.FC = () => {
                       placeholder={field.placeholder}
                       value={formData[field.key] || ''}
                       onChange={(e) => handleInputChange(field.key, e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                      className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                     {field.helpText && (
                       <p className="text-xs text-slate-500 mt-1">{field.helpText}</p>
@@ -202,7 +241,7 @@ export const CourierIntegration: React.FC = () => {
                 {isSaving ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span>Verifying...</span>
+                    <span>Saving...</span>
                   </>
                 ) : (
                   <>

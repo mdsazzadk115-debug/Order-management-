@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { OrderList } from './components/OrderList';
 import { CourierIntegration } from './components/CourierIntegration';
@@ -6,7 +6,7 @@ import { StatsCard } from './components/StatsCard';
 import { OrderModal } from './components/OrderModal';
 import { StoreIntegration } from './components/StoreIntegration';
 import { MOCK_ORDERS, FETCHED_ORDERS } from './services/mockData';
-import { fetchOrdersFromDB } from './services/dbService';
+import { fetchOrdersFromDB, getStoreConfigFromDB } from './services/dbService';
 import { Order, CourierProvider, CourierStatus, OrderStatus, StoreCredentials } from './types';
 import { Package, TrendingUp, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 
@@ -26,6 +26,17 @@ const App: React.FC = () => {
     isConnected: false
   });
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Load store config from DB on startup
+  useEffect(() => {
+    const loadStoreConfig = async () => {
+        const config = await getStoreConfigFromDB();
+        if (config) {
+            setStoreConfig(config);
+        }
+    };
+    loadStoreConfig();
+  }, []);
 
   // Function to sync orders (Try DB first, then fallback to Demo)
   const handleSyncOrders = async () => {

@@ -1,8 +1,6 @@
-import { Order, CustomerCourierStats } from '../types';
+import { Order, CustomerCourierStats, CourierConfig, StoreCredentials } from '../types';
 
 // অটোমেটিক এনভায়রনমেন্ট ডিটেকশন
-// ডেভেলপমেন্ট মোডে আপনার XAMPP বা লোকাল সার্ভারের পাথ ব্যবহার করবে
-// প্রোডাকশন (বিল্ড) মোডে রিলেটিভ পাথ ব্যবহার করবে
 const isProduction = (import.meta as any).env.PROD;
 
 const API_BASE_URL = isProduction 
@@ -11,25 +9,15 @@ const API_BASE_URL = isProduction
 
 export const fetchOrdersFromDB = async (): Promise<Order[]> => {
   try {
-    console.log(`Fetching from: ${API_BASE_URL}?action=get_orders`);
     const response = await fetch(`${API_BASE_URL}?action=get_orders`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const text = await response.text();
-    // অনেক সময় পিএইচপি এরর HTML রিটার্ন করে, তাই JSON পার্স করার আগে চেক করা ভালো
     try {
         const data = JSON.parse(text);
-        
-        // যদি ডাটাবেজ থেকে এরর মেসেজ আসে
         if (data.error) {
             console.error("Backend Error:", data.error);
             return [];
         }
-
-        // ডাটাবেসের ডাটাকে ফ্রন্টএন্ডের ফরম্যাটে ম্যাপ করা
         return data.map((item: any) => ({
           id: item.order_number,
           date: item.order_date,
@@ -71,4 +59,68 @@ export const fetchCustomerStatsFromDB = async (phone: string): Promise<CustomerC
     console.error("Error fetching stats:", error);
     return null;
   }
+};
+
+// --- NEW METHODS FOR CONFIGURATION ---
+
+export const saveCourierConfigToDB = async (config: CourierConfig): Promise<boolean> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}?action=save_courier_config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: config.id,
+                name: config.name,
+                connected: config.connected,
+                credentials: config.credentials
+            })
+        });
+        const result = await response.json();
+        return result.success === true;
+    } catch (error) {
+        console.error("Failed to save courier config:", error);
+        return false;
+    }
+};
+
+export const getCourierConfigsFromDB = async (): Promise<any[]> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}?action=get_courier_configs`);
+        if (!response.ok) return [];
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.error("Failed to fetch courier configs:", error);
+        return [];
+    }
+};
+
+export const saveStoreConfigToDB = async (config: StoreCredentials): Promise<boolean> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}?action=save_store_config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+        const result = await response.json();
+        return result.success === true;
+    } catch (error) {
+        console.error("Failed to save store config:", error);
+        return false;
+    }
+};
+
+export const getStoreConfigFromDB = async (): Promise<StoreCredentials | null> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}?action=get_store_config`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data && data.url) {
+            return data as StoreCredentials;
+        }
+        return null;
+    } catch (error) {
+        console.error("Failed to fetch store config:", error);
+        return null;
+    }
 };
