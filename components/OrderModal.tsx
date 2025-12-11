@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Order, CourierProvider, CourierStatus, CustomerCourierStats } from '../types';
-import { X, Truck, User, MapPin, Package, StickyNote, Activity, ShieldCheck, AlertTriangle, History } from 'lucide-react';
+import { X, Truck, User, MapPin, Package, StickyNote, Activity, ShieldCheck, AlertTriangle, History, Globe } from 'lucide-react';
 import { fetchCustomerStatsFromDB } from '../services/dbService';
 
 interface OrderModalProps {
@@ -76,7 +76,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({ order, onClose, onAssign
                 {loadingStats ? (
                   <div className="flex items-center justify-center py-6 space-x-2 text-slate-400">
                     <div className="w-4 h-4 border-2 border-slate-200 border-t-blue-600 rounded-full animate-spin"></div>
-                    <span className="text-sm">Checking database history...</span>
+                    <span className="text-sm">Checking database & Steadfast history...</span>
                   </div>
                 ) : customerStats ? (
                   <div className="space-y-4">
@@ -95,7 +95,11 @@ export const OrderModal: React.FC<OrderModalProps> = ({ order, onClose, onAssign
                            {customerStats.riskLabel}
                          </span>
                        </div>
-                       <span className="text-xs text-slate-400">Based on Order History</span>
+                       {/* Data Source Badge */}
+                       <div className="flex items-center space-x-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-600">
+                          <Globe className="w-3 h-3" />
+                          <span>{customerStats.source || 'Local Database'}</span>
+                       </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2">
@@ -119,7 +123,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({ order, onClose, onAssign
                     </div>
                     
                     <div className="text-xs text-slate-500 text-center pt-1">
-                       Total {customerStats.totalParcels} orders found in your database.
+                       Total {customerStats.totalParcels} orders found.
                     </div>
                   </div>
                 ) : (

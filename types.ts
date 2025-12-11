@@ -39,6 +39,7 @@ export interface CustomerCourierStats {
   successRate: number;
   lastOrderDate: string;
   riskLabel: 'Safe' | 'Moderate' | 'High Risk' | 'New Customer';
+  source?: string; // New field to indicate where data came from
 }
 
 export interface Order {
