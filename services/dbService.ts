@@ -61,6 +61,20 @@ export const fetchCustomerStatsFromDB = async (phone: string): Promise<CustomerC
   }
 };
 
+export const assignOrderToCourier = async (orderId: string, provider: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}?action=assign_courier`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId, provider })
+        });
+        const data = await response.json();
+        return data;
+    } catch (error: any) {
+        return { success: false, message: error.message };
+    }
+};
+
 // --- CONFIGURATION ---
 
 export const saveCourierConfigToDB = async (config: CourierConfig): Promise<{ success: boolean; message?: string }> => {

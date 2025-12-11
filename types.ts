@@ -1,3 +1,4 @@
+
 export enum OrderStatus {
   PENDING = 'Pending',
   PROCESSING = 'Processing',
@@ -37,7 +38,7 @@ export interface CustomerCourierStats {
   returned: number;
   successRate: number;
   lastOrderDate: string;
-  riskLabel: 'Safe' | 'Moderate' | 'High Risk';
+  riskLabel: 'Safe' | 'Moderate' | 'High Risk' | 'New Customer';
 }
 
 export interface Order {

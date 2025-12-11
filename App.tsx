@@ -6,7 +6,7 @@ import { StatsCard } from './components/StatsCard';
 import { OrderModal } from './components/OrderModal';
 import { StoreIntegration } from './components/StoreIntegration';
 import { MOCK_ORDERS, FETCHED_ORDERS } from './services/mockData';
-import { fetchOrdersFromDB, getStoreConfigFromDB, syncOrdersFromWooCommerce } from './services/dbService';
+import { fetchOrdersFromDB, getStoreConfigFromDB, syncOrdersFromWooCommerce, assignOrderToCourier } from './services/dbService';
 import { Order, CourierProvider, CourierStatus, OrderStatus, StoreCredentials } from './types';
 import { Package, TrendingUp, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 
@@ -55,8 +55,6 @@ const App: React.FC = () => {
       
       if (!syncResult.success) {
           console.warn("Sync Warning:", syncResult.message);
-          // We don't stop here, we still try to fetch what's in the DB, 
-          // but we alert the user if it's a critical failure.
           if (syncResult.message?.includes("API Error")) {
              alert(`Sync Failed: ${syncResult.message}`);
           }
@@ -71,10 +69,8 @@ const App: React.FC = () => {
         setOrders(dbOrders);
         setHasFetchedRealData(true);
       } else {
-        // If still empty after sync
         console.warn("No data found in DB even after sync.");
         if (!hasFetchedRealData) {
-           // Fallback to demo data only if we haven't successfully loaded real data yet
            alert("Database connection successful but no orders found in your store (or sync failed). Showing DEMO fetched data for visualization.");
            setOrders(FETCHED_ORDERS);
            setHasFetchedRealData(true);
@@ -88,30 +84,23 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAssignCourier = (orderId: string, provider: CourierProvider) => {
-    // Simulating API call to Pathao/RedX
-    const updatedOrders = orders.map(order => {
-      if (order.id === orderId) {
-        return {
-          ...order,
-          status: OrderStatus.PROCESSING,
-          courier: {
-            ...order.courier,
-            provider: provider,
-            status: CourierStatus.REQUESTED,
-            trackingId: `${provider.toUpperCase().substring(0,3)}-${Math.floor(Math.random() * 10000)}`, // Mock tracking ID
-            riderNote: '' // Reset note
-          }
-        };
-      }
-      return order;
-    });
-
-    setOrders(updatedOrders);
+  const handleAssignCourier = async (orderId: string, provider: CourierProvider) => {
+    // 1. Call Backend API
+    const result = await assignOrderToCourier(orderId, provider);
     
-    // Update the selected order in the modal immediately
-    const updatedOrder = updatedOrders.find(o => o.id === orderId);
-    if (updatedOrder) setSelectedOrder(updatedOrder);
+    if (result.success) {
+        // 2. Refresh Orders from DB
+        const dbOrders = await fetchOrdersFromDB();
+        setOrders(dbOrders);
+        
+        // 3. Update Selected Order View
+        const updatedOrder = dbOrders.find(o => o.id === orderId);
+        if (updatedOrder) setSelectedOrder(updatedOrder);
+        
+        alert(result.message || "Assigned successfully!");
+    } else {
+        alert("Failed to assign courier: " + result.message);
+    }
   };
 
   const renderContent = () => {

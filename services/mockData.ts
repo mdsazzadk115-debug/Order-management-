@@ -1,3 +1,4 @@
+
 import { Order, OrderStatus, CourierStatus, CourierProvider, CourierConfig, CustomerCourierStats } from '../types';
 
 export const MOCK_ORDERS: Order[] = [
@@ -208,7 +209,7 @@ export const getMockCustomerStats = (phone: string): Promise<CustomerCourierStat
       const delivered = totalParcels - returned;
       const successRate = Math.round((delivered / totalParcels) * 100);
       
-      let riskLabel: 'Safe' | 'Moderate' | 'High Risk' = 'Safe';
+      let riskLabel: 'Safe' | 'Moderate' | 'High Risk' | 'New Customer' = 'Safe';
       if (successRate < 70) riskLabel = 'High Risk';
       else if (successRate < 90) riskLabel = 'Moderate';
 

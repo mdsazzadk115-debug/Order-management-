@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Order, CourierProvider, CourierStatus, CustomerCourierStats } from '../types';
 import { X, Truck, User, MapPin, Package, StickyNote, Activity, ShieldCheck, AlertTriangle, History } from 'lucide-react';
-import { getMockCustomerStats } from '../services/mockData';
+import { fetchCustomerStatsFromDB } from '../services/dbService';
 
 interface OrderModalProps {
   order: Order | null;
@@ -13,16 +13,24 @@ export const OrderModal: React.FC<OrderModalProps> = ({ order, onClose, onAssign
   const [selectedProvider, setSelectedProvider] = useState<CourierProvider>(CourierProvider.PATHAO);
   const [customerStats, setCustomerStats] = useState<CustomerCourierStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     if (order) {
       setLoadingStats(true);
-      getMockCustomerStats(order.customer.phone).then(stats => {
+      fetchCustomerStatsFromDB(order.customer.phone).then(stats => {
         setCustomerStats(stats);
         setLoadingStats(false);
       });
     }
   }, [order]);
+
+  const handleAssignClick = async () => {
+    if(!order) return;
+    setIsProcessing(true);
+    await onAssignCourier(order.id, selectedProvider);
+    setIsProcessing(false);
+  };
 
   if (!order) return null;
 
@@ -68,25 +76,26 @@ export const OrderModal: React.FC<OrderModalProps> = ({ order, onClose, onAssign
                 {loadingStats ? (
                   <div className="flex items-center justify-center py-6 space-x-2 text-slate-400">
                     <div className="w-4 h-4 border-2 border-slate-200 border-t-blue-600 rounded-full animate-spin"></div>
-                    <span className="text-sm">Analyzing courier history...</span>
+                    <span className="text-sm">Checking database history...</span>
                   </div>
                 ) : customerStats ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                        <div className="flex items-center space-x-2">
-                         {customerStats.riskLabel === 'Safe' ? (
+                         {customerStats.riskLabel === 'Safe' || customerStats.riskLabel === 'New Customer' ? (
                            <ShieldCheck className="w-5 h-5 text-emerald-500" />
                          ) : (
                            <AlertTriangle className="w-5 h-5 text-rose-500" />
                          )}
                          <span className={`text-sm font-bold ${
                            customerStats.riskLabel === 'Safe' ? 'text-emerald-600' : 
-                           customerStats.riskLabel === 'Moderate' ? 'text-orange-600' : 'text-rose-600'
+                           customerStats.riskLabel === 'Moderate' ? 'text-orange-600' : 
+                           customerStats.riskLabel === 'New Customer' ? 'text-blue-600' : 'text-rose-600'
                          }`}>
-                           {customerStats.riskLabel} Customer
+                           {customerStats.riskLabel}
                          </span>
                        </div>
-                       <span className="text-xs text-slate-400">Checked via Courier Database</span>
+                       <span className="text-xs text-slate-400">Based on Order History</span>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2">
@@ -110,7 +119,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({ order, onClose, onAssign
                     </div>
                     
                     <div className="text-xs text-slate-500 text-center pt-1">
-                       Total {customerStats.totalParcels} parcels handled in network. Last seen: {customerStats.lastOrderDate}
+                       Total {customerStats.totalParcels} orders found in your database.
                     </div>
                   </div>
                 ) : (
@@ -172,13 +181,21 @@ export const OrderModal: React.FC<OrderModalProps> = ({ order, onClose, onAssign
                   </select>
 
                   <button 
-                    onClick={() => onAssignCourier(order.id, selectedProvider)}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-all shadow-sm flex items-center justify-center"
+                    onClick={handleAssignClick}
+                    disabled={isProcessing}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-all shadow-sm flex items-center justify-center space-x-2 disabled:opacity-70 disabled:cursor-not-allowed"
                   >
-                    Send Request to {selectedProvider}
+                    {isProcessing ? (
+                       <>
+                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                         <span>Sending Request...</span>
+                       </>
+                    ) : (
+                       <span>Send Request to {selectedProvider}</span>
+                    )}
                   </button>
                   
-                  {customerStats && customerStats.riskLabel !== 'Safe' && (
+                  {customerStats && customerStats.riskLabel === 'High Risk' && (
                      <div className="mt-3 text-xs text-rose-600 flex items-start bg-rose-50 p-2 rounded">
                         <AlertTriangle className="w-4 h-4 mr-1 shrink-0" />
                         <span>Warning: High return rate detected. Verify via phone before shipping.</span>
