@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { COURIER_CONFIGS } from '../services/mockData';
 import { saveCourierConfigToDB, getCourierConfigsFromDB } from '../services/dbService';
-import { CheckCircle, XCircle, Key, ExternalLink, Settings, Save, X, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { CheckCircle, XCircle, Key, ExternalLink, Settings, Save, X, AlertTriangle, ShieldCheck, Link2, Copy } from 'lucide-react';
 import { CourierConfig } from '../types';
 
 export const CourierIntegration: React.FC = () => {
@@ -91,6 +91,18 @@ export const CourierIntegration: React.FC = () => {
           }
       }
     }
+  };
+
+  // Helper to generate Webhook URL
+  const getWebhookUrl = () => {
+      if (typeof window !== 'undefined') {
+          // Assuming backend is in /backend folder relative to domain root
+          const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
+          // Clean up trailing slash
+          const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+          return `${cleanBaseUrl}backend/webhook_steadfast.php`;
+      }
+      return 'https://your-domain.com/backend/webhook_steadfast.php';
   };
 
   return (
@@ -201,6 +213,35 @@ export const CourierIntegration: React.FC = () => {
                   </p>
                 </div>
               </div>
+
+              {/* Webhook Section for Steadfast */}
+              {selectedCourier.id === 'steadfast' && (
+                  <div className="mb-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                      <div className="flex items-center space-x-2 mb-2">
+                          <Link2 className="w-4 h-4 text-slate-600" />
+                          <label className="text-sm font-semibold text-slate-800">Webhook URL</label>
+                      </div>
+                      <p className="text-xs text-slate-500 mb-2">Provide this URL to Steadfast support to enable real-time status updates.</p>
+                      <div className="flex items-center">
+                          <input 
+                            type="text" 
+                            readOnly 
+                            value={getWebhookUrl()} 
+                            className="flex-1 bg-white border border-slate-300 text-slate-600 text-xs p-2 rounded-l-lg outline-none"
+                          />
+                          <button 
+                            onClick={() => {
+                                navigator.clipboard.writeText(getWebhookUrl());
+                                alert('URL Copied to clipboard!');
+                            }}
+                            className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-r-lg border border-l-0 border-slate-300 transition-colors"
+                            title="Copy URL"
+                          >
+                              <Copy className="w-4 h-4" />
+                          </button>
+                      </div>
+                  </div>
+              )}
 
               <form id="configForm" onSubmit={handleSaveConfig} className="space-y-4">
                 {selectedCourier.authFields.map((field) => (
